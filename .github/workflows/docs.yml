@@ -10,9 +10,10 @@ permissions:
   pages: write
   id-token: write
 
+# One deploy at a time: a deploy that started finishes, and only the newest waiting run follows it.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
