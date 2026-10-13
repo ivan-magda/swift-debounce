@@ -188,7 +188,9 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
     @inlinable
     mutating func receive(_ value: Value, now: UInt64) {
         if windowEnd != nil {
-            if edges.contains(.trailing) { trailingValue = value }
+            if edges.contains(.trailing) {
+              trailingValue = value
+            }
         } else {
             windowEnd = _deadline(after: now, adding: interval)
             if edges.contains(.leading) {
@@ -210,7 +212,10 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
         }
 
         if let end = windowEnd {
-            if now < end { return .sleep(until: end) }
+            if now < end {
+              return .sleep(until: end)
+            }
+
             if let value = trailingValue {
                 trailingValue = nil
                 // With a leading edge the next value would otherwise start right away, closer
@@ -219,6 +224,7 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
                 isRunning = true
                 return .run(value)
             }
+
             windowEnd = nil
         }
         isWorkerActive = false
