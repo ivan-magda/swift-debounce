@@ -63,21 +63,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # The Swift 6.0 compiler builds and tests every target. A macOS build needs no extra platform,
+      # so Xcode 16.0 works as installed on the runner.
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '16.0'
 
-      # Finish setting up the selected Xcode. Without it, xcodebuild sometimes reports the iOS,
-      # tvOS, watchOS and visionOS platforms of this older Xcode as not installed.
-      - name: Finish Xcode setup
-        run: xcodebuild -runFirstLaunch
-
       - name: Test
         run: swift test
 
-      # Newer Xcode versions raise the deployment targets silently (iOS 15, watchOS 9, ...).
-      # Xcode 16 still builds for the package's real minimums: iOS 13, tvOS 13, watchOS 6, visionOS 1.
-      # The scheme builds DebounceSwiftUI too, which checks its availability annotations there.
+      # xcodebuild needs a platform's simulator runtime even for a generic device build. On
+      # macos-15 only Xcode 16.4 among 16.x has them installed (16.0 to 16.3 ship with
+      # "install_runtimes": "none"). It has the same deployment-target floor as 16.0, while newer
+      # Xcode versions raise the targets silently (iOS 15, watchOS 9, ...).
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
+
       - name: Build for the minimum iOS, tvOS, watchOS, visionOS
         run: |
           for platform in iOS tvOS watchOS visionOS; do
