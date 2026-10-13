@@ -77,7 +77,7 @@ A profile (`Locks profile`) of that version's `send` showed the lock wasn't the 
 - **`ContinuousClock.Instant` isn't `@frozen`.** It comes from the `_Concurrency` library, which is built with library evolution, so its size isn't known at compile time. Every state-machine value that holds one goes through runtime metadata lookups (`swift_getGenericMetadata`, `swift_getTupleTypeMetadata3`) and value-witness copies on every `send`. Specializing for the value type doesn't help.
 - **Reading the clock.** `ContinuousClock.now` takes 29 ns. `mach_continuous_time()`, the counter behind it, takes 5 ns ([`locks.md`](results/2026-10-13/locks.md), section 1).
 
-So the package stores deadlines as `UInt64` ticks of `mach_continuous_time`. Section 4 of [`locks.md`](results/2026-10-13/locks.md) runs that algorithm with eight different locks: the best lock gets it to 94 ns, while the package's `send` takes 14 ns.
+So the package stores deadlines as `UInt64` ticks of `mach_continuous_time`. Section 4 of [`locks.md`](results/2026-10-13/locks.md) shows that the lock alone doesn't close the gap: it keeps the long-lived-task algorithm, `ContinuousClock.Instant` included, and swaps only the lock. The best of eight locks brings `send` to 94 ns, while the package's `send` takes 14 ns.
 
 **Specialization.** A generic class from another module runs unspecialized unless its code is `@inlinable`. While prototyping, the same `send` cost about 110 ns without `@inlinable` and 12-13 ns with it (or with `-cross-module-optimization`). The package marks `send` `@inlinable`, so your app compiles a version for your value type.
 
@@ -98,7 +98,7 @@ Uncontended, every real lock costs 8-9 ns, except `NSRecursiveLock` at 17 ns. A 
 | `DispatchSemaphore` | 9.6 ns | 1,298 ns |
 | `DispatchQueue.sync` | 257 ns | 2,143 ns |
 
-The raw-lock numbers under contention are noisy from run to run. Inside the real algorithm, the `os_unfair_lock` family used less CPU and caused 10 times fewer context switches than `NSLock` or `pthread_mutex_t` ([`locks.md`](results/2026-10-13/locks.md), section 4). Semaphores and serial queues park threads and wake them up again, about 800,000 context switches for 800,000 sends.
+The raw-lock numbers under contention are noisy from run to run. Inside a full debouncer (the long-lived-task algorithm from section 2), the `os_unfair_lock` family used less CPU and caused 10 times fewer context switches than `NSLock` or `pthread_mutex_t` ([`locks.md`](results/2026-10-13/locks.md), section 4). Semaphores and serial queues park threads and wake them up again, about 800,000 context switches for 800,000 sends.
 
 **Not an actor.** With an actor, `send` becomes `async`. Called from the main actor it costs about 6 µs, because every call hops to the actor and back. Code that isn't async would have to wrap each call in a `Task`, which brings back the task-per-value cost.
 
@@ -143,9 +143,12 @@ The differences stay under 0.4 ms, well below what a person notices. Re-arming t
 |---|---:|
 | `send` from 1 thread | 10.5 ns |
 | `send` from 8 threads at once | 48 ns |
-| steady stream, interval 50 ms: gap between starts (median / min / p95) | 50.8 / 50.0 / 52.6 ms |
+| steady stream, interval 50 ms: gap between starts (median / min / p95) | 51.0 / 49.8 / 53.1 ms |
+| main-actor action, main actor blocked 30 ms of every 50 ms: shortest gap | 50.0 ms |
 
-With a value every millisecond for 2 seconds and a 50 ms interval, the throttler started the action 41 times and never twice within 50 ms ([`throttling.md`](results/2026-10-13/throttling.md)).
+With a value every millisecond for 2 seconds and a 50 ms interval, the throttler started the action about 40 times per run. Across 5 runs of each scenario, no gap between two starts was shorter than 49.5 ms ([`throttling.md`](results/2026-10-14/throttling.md)). The gaps are timed inside the action, a few microseconds after it starts, so a gap can measure slightly under 50 ms.
+
+The second scenario covers a late start. The worker decides to run a value, then hops to the action's actor. When that actor is busy, for example the main actor during a long layout pass, the action starts later than decided. Version 1.0.0 measured the interval from the decision, so the next start could follow a late one almost immediately: 47 of 200 gaps were shorter than 49.5 ms, the shortest 20 ms ([`throttling-1.0.0.md`](results/2026-10-14/throttling-1.0.0.md)). Since 1.0.1 the interval is measured from the real start on the action's actor.
 
 ## Caveats
 

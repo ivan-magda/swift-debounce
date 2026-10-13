@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-14
+
+### Fixed
+
+- `Throttler` and `onChange(of:throttle:)` now measure the interval from the moment the action really starts on its actor. Before, it was measured from when the throttler decided to start it, so if the main actor was busy at that moment, the next action could start right after the late one.
+
 ## [1.0.0] - 2026-10-13
 
 The first stable release. From here on, the public API follows Semantic Versioning.
@@ -24,6 +30,7 @@ The first stable release. From here on, the public API follows Semantic Versioni
 - `cancel()`; releasing a debouncer or throttler cancels it too.
 - Initializers that take a `Duration` (iOS 16, macOS 13 and later) or a `TimeInterval`.
 
-[Unreleased]: https://github.com/ivan-magda/swift-debounce/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/ivan-magda/swift-debounce/compare/1.0.1...HEAD
+[1.0.1]: https://github.com/ivan-magda/swift-debounce/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/ivan-magda/swift-debounce/compare/0.1.0...1.0.0
 [0.1.0]: https://github.com/ivan-magda/swift-debounce/releases/tag/0.1.0

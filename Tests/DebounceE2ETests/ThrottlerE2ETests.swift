@@ -110,6 +110,24 @@ extension TimingTests {
             #expect(await eventually { threads == [true] })
         }
 
+        /// The first start is due while the main actor is busy, so it happens late. The next start
+        /// still waits a full interval from that late start.
+        @MainActor
+        @Test func busyMainActorDoesNotBringStartsCloser() async {
+            var starts: [UInt64] = []
+            let throttler = Throttler(for: 0.1) { (_: Int) in starts.append(now()) }
+            throttler.send(1)
+            Task.detached {
+                await sleep(milliseconds: 20)
+                throttler.send(2)
+            }
+            let busyUntil = now() + 250_000_000
+            while now() < busyUntil {} // a long layout pass, for example
+            #expect(await eventually { starts.count == 2 })
+            #expect(starts.count == 2 && starts[1] - starts[0] >= 95_000_000,
+                    "starts \(zip(starts, starts.dropFirst()).map { ($1 - $0) / 1_000_000 }) ms apart")
+        }
+
         @Test func voidThrottlerSendsSignals() async {
             let count = Recorder<Void>()
             let refresh = Throttler(for: 0.05) { count.append(()) }

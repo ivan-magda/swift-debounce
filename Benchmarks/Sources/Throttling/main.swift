@@ -13,6 +13,8 @@ func contextSwitches() -> Int { var ru = rusage(); getrusage(RUSAGE_SELF, &ru); 
 func median(_ xs: [Double]) -> Double { let s = xs.sorted(); return s[s.count / 2] }
 func percentile(_ xs: [Double], _ p: Double) -> Double { let s = xs.sorted(); return s[min(s.count - 1, Int(Double(s.count - 1) * p))] }
 func f(_ x: Double, _ digits: Int = 1) -> String { String(format: "%.\(digits)f", x) }
+/// Gaps are timed inside the action, a few microseconds after the start; allow for that.
+let shortGapRatio = 0.99
 extension Duration { var ns: Double { Double(components.seconds) * 1e9 + Double(components.attoseconds) / 1e9 } }
 
 final class Starts: Sendable {
@@ -86,7 +88,8 @@ do {
 // 3. Pace under a steady stream
 do {
     let interval = 50.0
-    var counts: [Double] = [], gapMedian: [Double] = [], gapMin: [Double] = [], gapP95: [Double] = [], cpuPerSecond: [Double] = []
+    var counts: [Double] = [], gapMedian: [Double] = [], gapP95: [Double] = [], cpuPerSecond: [Double] = []
+    var allGaps: [Double] = []
     for _ in 0..<5 {
         let starts = Starts()
         let t = Throttler<Int>(for: .milliseconds(Int(interval)), action: starts.record)
@@ -103,11 +106,53 @@ do {
         let times = starts.times.withLock { $0 }
         let gaps = zip(times, times.dropFirst()).map { ($1 - $0).ns / 1e6 }
         counts.append(Double(times.count))
-        gapMedian.append(median(gaps)); gapMin.append(gaps.min()!); gapP95.append(percentile(gaps, 0.95))
+        gapMedian.append(median(gaps)); gapP95.append(percentile(gaps, 0.95)); allGaps += gaps
         withExtendedLifetime(t) {}
     }
     print("\n## 3. Steady stream: a value every ~1 ms for 2 s, interval \(Int(interval)) ms")
-    print("| starts | gap median, ms | gap min, ms | gap p95, ms | CPU ms per second (incl. the sending loop) |")
-    print("|---:|---:|---:|---:|---:|")
-    print("| \(f(median(counts), 0)) | \(f(median(gapMedian), 2)) | \(f(median(gapMin), 2)) | \(f(median(gapP95), 2)) | \(f(median(cpuPerSecond), 2)) |")
+    print("| starts | gap median, ms | gap min (all runs), ms | gaps under \(f(interval * shortGapRatio, 1)) ms | gap p95, ms | CPU ms per second (incl. the sending loop) |")
+    print("|---:|---:|---:|---:|---:|---:|")
+    print("| \(f(median(counts), 0)) | \(f(median(gapMedian), 2)) | \(f(allGaps.min()!, 2)) | \(allGaps.filter { $0 < interval * shortGapRatio }.count) of \(allGaps.count) | \(f(median(gapP95), 2)) | \(f(median(cpuPerSecond), 2)) |")
+}
+
+// 4. A main-actor action while the main actor is busy now and then
+//
+// The action starts on the main actor. Every 50 ms the main actor is blocked for 30 ms, as during a
+// long layout pass, so starts often come later than the throttler decided. The interval must still
+// hold between the real starts.
+do {
+    let interval = 50.0
+    var allGaps: [Double] = [], counts: [Double] = []
+    for _ in 0..<5 {
+        let (gaps, count) = await busyMainActorRun(interval: interval)
+        allGaps += gaps; counts.append(Double(count))
+    }
+    print("\n## 4. Main-actor action, main actor blocked 30 ms of every 50 ms, a value every ~1 ms for 2 s, interval \(Int(interval)) ms")
+    print("| starts | gap median, ms | gap min (all runs), ms | gaps under \(f(interval * shortGapRatio, 1)) ms |")
+    print("|---:|---:|---:|---:|")
+    print("| \(f(median(counts), 0)) | \(f(median(allGaps), 2)) | \(f(allGaps.min()!, 2)) | \(allGaps.filter { $0 < interval * shortGapRatio }.count) of \(allGaps.count) |")
+}
+
+@MainActor
+func busyMainActorRun(interval: Double) async -> (gaps: [Double], starts: Int) {
+    var times: [ContinuousClock.Instant] = []
+    let t = Throttler<Int>(for: .milliseconds(Int(interval))) { @MainActor (_: Int) in times.append(.now) }
+    let begin = ContinuousClock.now
+    let sender = Task.detached {
+        var i = 0
+        while ContinuousClock.now - begin < .seconds(2) {
+            t.send(i); i += 1
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+    }
+    while ContinuousClock.now - begin < .seconds(2) {
+        let busyUntil = ContinuousClock.now + .milliseconds(30)
+        while ContinuousClock.now < busyUntil {}
+        try? await Task.sleep(for: .milliseconds(20))
+    }
+    await sender.value
+    try? await Task.sleep(for: .milliseconds(Int(interval) * 3))
+    withExtendedLifetime(t) {}
+    let gaps = zip(times, times.dropFirst()).map { ($1 - $0).ns / 1e6 }
+    return (gaps, times.count)
 }

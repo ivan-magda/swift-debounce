@@ -16,29 +16,42 @@ import Testing
     }
 
     /// Simulates the worker driving `machine` for the given sends and action durations.
+    ///
+    /// `hop` is the time between the worker deciding to run a value and the action starting on its
+    /// actor, for example while the main actor is busy.
     static func simulate<M: _PacingMachine>(
         _ machine: inout M,
         sends: [UInt64],
         duration: (Int) -> UInt64,
-        startDelay: UInt64
+        startDelay: UInt64,
+        hop: (Int) -> UInt64 = { _ in 0 }
     ) -> [Run] where M.Value == Int {
         var runs: [Run] = []
         var wake: UInt64? = nil // when the worker next asks the machine
         var sendIndex = 0
         var actionJustReturned = false
+
+        func deliverSends(before time: UInt64) {
+            while sendIndex < sends.count, sends[sendIndex] < time {
+                _ = machine.send(sendIndex, now: sends[sendIndex])
+                sendIndex += 1
+            }
+        }
+
         while sendIndex < sends.count || wake != nil {
             let nextSend = sendIndex < sends.count ? sends[sendIndex] : .max
             if let w = wake, w <= nextSend {
                 switch machine.next(now: w) {
                 case .run(let value):
-                    let end = w + duration(value)
-                    runs.append(Run(value: value, start: w, end: end, followsPrevious: actionJustReturned))
+                    // sends that arrive while the worker hops to the action's actor
+                    let start = w + hop(value)
+                    deliverSends(before: start)
+                    machine.recordStart(now: start)
+                    let end = start + duration(value)
+                    runs.append(Run(value: value, start: start, end: end, followsPrevious: actionJustReturned))
                     actionJustReturned = true
                     // sends that arrive while the action runs
-                    while sendIndex < sends.count, sends[sendIndex] < end {
-                        _ = machine.send(sendIndex, now: sends[sendIndex])
-                        sendIndex += 1
-                    }
+                    deliverSends(before: end)
                     wake = end
                 case .sleep(let until):
                     actionJustReturned = false
@@ -55,6 +68,7 @@ import Testing
                 sendIndex += 1
             }
         }
+
         return runs
     }
 
@@ -79,9 +93,11 @@ import Testing
             var m = _DebounceMachine<Int>(interval: Self.interval, edges: edges)
             let runs = Self.simulate(&m, sends: sends, duration: { _ in rng.next() % maxDuration }, startDelay: delay)
             checkCommon(runs, sends: sends)
+
             if edges.contains(.trailing) {
                 #expect(runs.last?.value == sends.count - 1, "the last value is always delivered")
             }
+
             if edges == .trailing {
                 for run in runs {
                     let next = run.value + 1 < sends.count ? sends[run.value + 1] : .max
@@ -90,17 +106,20 @@ import Testing
                             "a value is only delivered once its burst is over")
                 }
             }
+
             if edges == .leading {
                 // A burst starts with a value sent at least one interval after the previous one.
                 let burstStarts = sends.indices.filter { $0 == 0 || sends[$0] >= sends[$0 - 1] + Self.interval }
                 #expect(runs.first?.value == 0, "the first value runs")
                 #expect(runs.allSatisfy { burstStarts.contains($0.value) }, "only the first value of a burst runs")
                 #expect(runs.last?.value == burstStarts.last, "the last burst always runs")
+
                 for (previous, run) in zip([nil] + runs.map(Optional.some), runs) {
                     let free = max(sends[run.value] + delay, previous?.end ?? 0)
                     #expect(run.start <= free, "a burst's first value runs as soon as the worker is free")
                 }
             }
+
             #expect(!m.isWorkerActive)
         }
     }
@@ -112,22 +131,30 @@ import Testing
             let sends = Self.randomSends(&rng, count: Int(rng.next() % 40) + 1)
             let maxDuration = rng.next() % 300 + 1
             let delay = rng.next() % 5
+            // Sometimes the action's actor is busy, for up to 2.5 intervals, when the action is due.
+            let hop: (Int) -> UInt64 = { _ in rng.next() % 3 == 0 ? rng.next() % 250 : 0 }
             var m = _ThrottleMachine<Int>(interval: Self.interval, edges: edges)
-            let runs = Self.simulate(&m, sends: sends, duration: { _ in rng.next() % maxDuration }, startDelay: delay)
+            let runs = Self.simulate(
+                &m, sends: sends, duration: { _ in rng.next() % maxDuration }, startDelay: delay, hop: hop
+            )
             checkCommon(runs, sends: sends)
+
             for (a, b) in zip(runs, runs.dropFirst()) {
                 #expect(b.start >= a.start + Self.interval, "starts are at least one interval apart")
             }
             checkFollowUpRunsGetTheLatestValue(runs, sends: sends)
+
             if edges.contains(.trailing) {
                 #expect(runs.last?.value == sends.count - 1, "the last value is always delivered")
             }
+
             if edges == .leading, let last = runs.last {
                 #expect(runs.first?.value == 0, "the first value runs")
                 if sends[sends.count - 1] >= last.start + Self.interval {
                     #expect(last.value == sends.count - 1, "a value sent after the last interval ended runs")
                 }
             }
+
             #expect(!m.isWorkerActive)
         }
     }
