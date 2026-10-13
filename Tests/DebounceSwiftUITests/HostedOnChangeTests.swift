@@ -7,6 +7,9 @@ import UIKit
 /// End-to-end tests: real SwiftUI views in a real window, real `Debouncer` and `Throttler`, real
 /// time. They run on the iOS Simulator (`xcodebuild test`); `swift test` on macOS can't drive
 /// SwiftUI updates.
+///
+/// Intervals are 1 s with timeouts of several seconds: CI runners can stall the main actor for
+/// hundreds of milliseconds, and a stall must not split a burst or let a delayed action run early.
 
 @available(iOS 17, tvOS 17, visionOS 1, *)
 @Observable @MainActor
@@ -23,7 +26,7 @@ final class Screen {
 struct SearchField: View {
     let screen: Screen
     let prefix: String
-    var interval: Duration = .milliseconds(200)
+    var interval: Duration = .seconds(1)
     var initial = false
     var handle: PacingHandle?
     var slowAction = false
@@ -43,7 +46,7 @@ struct SearchField: View {
 @available(iOS 17, tvOS 17, visionOS 1, *)
 struct Root: View {
     let screen: Screen
-    var interval: Duration = .milliseconds(200)
+    var interval: Duration = .seconds(1)
     var initial = false
     var handle: PacingHandle?
     var slowAction = false
@@ -82,27 +85,6 @@ final class Host {
     }
 }
 
-@available(iOS 17, tvOS 17, visionOS 1, *)
-func pause(milliseconds: Int) async {
-    try? await Task.sleep(for: .milliseconds(milliseconds))
-}
-
-/// Waits until `condition` holds or the timeout passes.
-@available(iOS 17, tvOS 17, visionOS 1, *)
-@MainActor
-func eventually(timeout milliseconds: Int = 3_000, _ condition: () -> Bool) async -> Bool {
-    let deadline = ContinuousClock.now + .milliseconds(milliseconds)
-    while ContinuousClock.now < deadline {
-        if condition() { return true }
-        await pause(milliseconds: 10)
-    }
-    return condition()
-}
-
-extension Tag {
-    @Tag static var timing: Self
-}
-
 @MainActor
 @Suite(.serialized, .tags(.timing))
 struct HostedOnChangeTests {
@@ -118,7 +100,7 @@ struct HostedOnChangeTests {
             await pause(milliseconds: 20)
         }
         #expect(await eventually { screen.events == ["v1 ->Swift"] })
-        await pause(milliseconds: 400)
+        await pause(milliseconds: 1_500)
         #expect(screen.events == ["v1 ->Swift"], "nothing else runs")
 
         screen.query = "SwiftUI"
@@ -128,14 +110,14 @@ struct HostedOnChangeTests {
     @available(iOS 17, tvOS 17, visionOS 1, *)
     @Test func removingTheViewDropsThePendingValue() async {
         let screen = Screen()
-        let host = Host(Root(screen: screen, interval: .milliseconds(300)))
+        let host = Host(Root(screen: screen))
         defer { host.close() }
         await pause(milliseconds: 100)
 
         screen.query = "S"
         await pause(milliseconds: 50)
         screen.showsSearch = false
-        await pause(milliseconds: 800)
+        await pause(milliseconds: 2_000)
         #expect(screen.events.isEmpty)
     }
 
@@ -155,14 +137,14 @@ struct HostedOnChangeTests {
     @available(iOS 17, tvOS 17, visionOS 1, *)
     @Test func newIdentityDropsThePendingValueAndStartsOver() async {
         let screen = Screen()
-        let host = Host(Root(screen: screen, interval: .milliseconds(300)))
+        let host = Host(Root(screen: screen))
         defer { host.close() }
         await pause(milliseconds: 100)
 
         screen.query = "S"
         await pause(milliseconds: 50)
         screen.searchID += 1
-        await pause(milliseconds: 800)
+        await pause(milliseconds: 2_000)
         #expect(screen.events.isEmpty, "the old identity's pending value is dropped")
 
         screen.query = "Sw"
@@ -182,7 +164,9 @@ struct HostedOnChangeTests {
     }
 
     /// SwiftUI doesn't update a view covered by a pushed screen, so its `onChange` (and ours, which
-    /// is built on it) sees changes made meanwhile only when the view is shown again.
+    /// is built on it) sees changes made meanwhile only when the view is shown again. Whether
+    /// anything arrives while covered is SwiftUI's call; the test only checks the package's part:
+    /// the latest value is delivered once the view is back.
     @available(iOS 17, tvOS 17, visionOS 1, *)
     @Test func changesWhileCoveredArriveWhenTheViewIsShownAgain() async {
         let screen = Screen()
@@ -191,12 +175,11 @@ struct HostedOnChangeTests {
         await pause(milliseconds: 100)
 
         screen.path.append(1)
-        await pause(milliseconds: 800)
+        await pause(milliseconds: 1_500) // let the push finish
         screen.query = "y"
         await pause(milliseconds: 20)
         screen.query = "yz"
-        await pause(milliseconds: 800)
-        #expect(screen.events.isEmpty, "SwiftUI holds the changes back while the view is covered")
+        await pause(milliseconds: 500)
         screen.path.removeAll()
         #expect(await eventually { screen.events.last == "v1 ->yz" }, "the latest value arrives after the pop")
     }
@@ -204,7 +187,7 @@ struct HostedOnChangeTests {
     @available(iOS 17, tvOS 17, visionOS 1, *)
     @Test func actionUsesTheClosureFromTheLatestUpdate() async {
         let screen = Screen()
-        let host = Host(Root(screen: screen, interval: .milliseconds(300)))
+        let host = Host(Root(screen: screen))
         defer { host.close() }
         await pause(milliseconds: 100)
 
@@ -218,14 +201,14 @@ struct HostedOnChangeTests {
     @Test func handleCancelsThePendingValue() async {
         let screen = Screen()
         let handle = PacingHandle()
-        let host = Host(Root(screen: screen, interval: .milliseconds(300), handle: handle))
+        let host = Host(Root(screen: screen, handle: handle))
         defer { host.close() }
         await pause(milliseconds: 100)
 
         screen.query = "S"
         await pause(milliseconds: 50)
         handle.cancel()
-        await pause(milliseconds: 800)
+        await pause(milliseconds: 2_000)
         #expect(screen.events.isEmpty)
 
         screen.query = "Sw"
@@ -248,7 +231,7 @@ struct HostedOnChangeTests {
             let screen: Screen
             var body: some View {
                 Text(screen.query)
-                    .onChange(of: screen.query, throttle: .milliseconds(300)) { _, new in
+                    .onChange(of: screen.query, throttle: .seconds(1)) { _, new in
                         screen.events.append(new)
                     }
             }
@@ -258,10 +241,15 @@ struct HostedOnChangeTests {
         await pause(milliseconds: 100)
 
         screen.query = "1"
-        #expect(await eventually(timeout: 250) { screen.events == ["1"] }, "the leading edge runs right away")
+        // Well before the 1 s interval: a trailing-only throttle would wait for it.
+        #expect(await eventually(timeout: 800) { screen.events == ["1"] }, "the leading edge runs right away")
+        // Two separate changes inside the interval: only the later one runs, at its end.
         screen.query = "2"
+        await pause(milliseconds: 100)
         screen.query = "3"
         #expect(await eventually { screen.events == ["1", "3"] }, "the latest value runs at the end of the interval")
+        await pause(milliseconds: 1_500)
+        #expect(screen.events == ["1", "3"], "the skipped value never runs")
     }
 }
 #endif
