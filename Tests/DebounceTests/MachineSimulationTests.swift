@@ -101,7 +101,7 @@ import Testing
                     #expect(run.start <= free, "a burst's first value runs as soon as the worker is free")
                 }
             }
-            #expect(m.isWorkerActive == false)
+            #expect(!m.isWorkerActive)
         }
     }
 
@@ -128,7 +128,7 @@ import Testing
                     #expect(last.value == sends.count - 1, "a value sent after the last interval ended runs")
                 }
             }
-            #expect(m.isWorkerActive == false)
+            #expect(!m.isWorkerActive)
         }
     }
 

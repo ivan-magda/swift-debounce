@@ -14,7 +14,7 @@ import Testing
         #expect(m.next(now: 50) == .sleep(until: 150), "each value extends the burst")
         #expect(m.next(now: 150) == .run("b"))
         #expect(m.next(now: 160) == .exit)
-        #expect(m.isWorkerActive == false)
+        #expect(!m.isWorkerActive)
     }
 
     @Test func trailingWaitsForEarlyWakeUps() {
@@ -103,7 +103,7 @@ import Testing
         var m = machine()
         _ = m.send("a", now: 0)
         m.reset()
-        #expect(m.isWorkerActive == false)
+        #expect(!m.isWorkerActive)
         #expect(m.next(now: 1_000) == .exit)
         #expect(m.send("b", now: 1_000) == true, "a reset machine starts a new worker")
     }

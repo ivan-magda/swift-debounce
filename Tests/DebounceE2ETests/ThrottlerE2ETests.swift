@@ -70,7 +70,7 @@ extension TimingTests {
             #expect(probe.peak == 1)
         }
 
-        @Test func slowActionIsFollowedByTheLatestValueOnly() async {
+        @Test func slowActionIsFollowedByTheLatestValueOnly() async throws {
             let values = Recorder<Int>()
             let started = Recorder<Int>()
             let gate = Gate()
@@ -80,7 +80,7 @@ extension TimingTests {
                 values.append(value)
             }
             throttler.send(0)
-            #expect(await eventually { started.values == [0] })
+            try #require(await eventually { started.values == [0] })
             throttler.send(1)
             await sleep(milliseconds: 200) // the interval is over, but 0 is still running
             throttler.send(2)
@@ -91,12 +91,12 @@ extension TimingTests {
             #expect(values.values == [0, 3])
         }
 
-        @Test func cancelDropsThePendingValue() async {
+        @Test func cancelDropsThePendingValue() async throws {
             let values = Recorder<Int>()
             let throttler = Throttler(for: 0.5) { (value: Int) in values.append(value) }
             throttler.send(1) // runs right away
             throttler.send(2) // pending for the trailing edge
-            #expect(await eventually { values.values == [1] })
+            try #require(await eventually { values.values == [1] })
             throttler.cancel()
             await sleep(milliseconds: 700)
             #expect(values.values == [1])

@@ -15,6 +15,8 @@ func eventually(timeout seconds: Double = 3, _ condition: () -> Bool) async -> B
     return condition()
 }
 
+// Serialized on purpose: the README examples talk to shared singletons (`SearchService.shared`,
+// `Analytics.shared`), and each test resets and then inspects them.
 @MainActor
 @Suite(.serialized)
 struct ExamplesTests {

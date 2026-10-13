@@ -48,8 +48,8 @@ extension TimingTests {
             #expect(await eventually { values.values == ["a", "c"] })
         }
 
+        @available(macOS 13, iOS 16, tvOS 16, watchOS 9, *)
         @Test func durationInitializerWorks() async {
-            guard #available(macOS 13, iOS 16, tvOS 16, watchOS 9, *) else { return }
             let values = Recorder<Int>()
             let debouncer = Debouncer(for: .milliseconds(30)) { (value: Int) in values.append(value) }
             debouncer.send(1)
@@ -118,7 +118,7 @@ extension TimingTests {
             usleep(150_000)
             debouncer.cancel()
             await sleep(milliseconds: 100)
-            #expect(didRun == false)
+            #expect(!didRun)
         }
 
         // MARK: Serial execution
@@ -142,7 +142,7 @@ extension TimingTests {
         }
 
         /// Rule R1 across `cancel()`: the next action waits for the cancelled one to return.
-        @Test func nextActionWaitsForACancelledActionThatIsStillRunning() async {
+        @Test func nextActionWaitsForACancelledActionThatIsStillRunning() async throws {
             let events = Recorder<String>()
             let gate = Gate()
             let debouncer = Debouncer(for: 0.01) { (value: Int) in
@@ -151,7 +151,7 @@ extension TimingTests {
                 events.append("end \(value)")
             }
             debouncer.send(1)
-            #expect(await eventually { events.values == ["start 1"] })
+            try #require(await eventually { events.values == ["start 1"] })
             debouncer.cancel()
             debouncer.send(2)
             await sleep(milliseconds: 100)

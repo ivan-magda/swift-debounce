@@ -2,7 +2,7 @@
 import Foundation
 import Testing
 
-@Suite(.serialized) struct EngineTests {
+@Suite struct EngineTests {
     final class Payload: Sendable {}
 
     @Test func coreAndPendingValueAreReleasedAfterDeinit() async {
