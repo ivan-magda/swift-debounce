@@ -1,8 +1,8 @@
 # swift-debounce
 
 [![CI](https://github.com/ivan-magda/swift-debounce/actions/workflows/ci.yml/badge.svg)](https://github.com/ivan-magda/swift-debounce/actions/workflows/ci.yml)
-[![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-F05138.svg)](https://swift.org)
-[![Platforms](https://img.shields.io/badge/platforms-iOS%2013%20|%20macOS%2010.15%20|%20tvOS%2013%20|%20watchOS%206%20|%20visionOS%20|%20Linux-blue.svg)](#installation)
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fivan-magda%2Fswift-debounce%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/ivan-magda/swift-debounce)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fivan-magda%2Fswift-debounce%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/ivan-magda/swift-debounce)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
 
 Debounce and throttle for Swift Concurrency. You call `send(_:)` from any thread, without `await`, and your async action runs at the right moment, one at a time.
