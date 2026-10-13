@@ -18,7 +18,7 @@ jobs:
     # A normal run takes under 10 minutes; a stuck simulator would otherwise hold the runner for hours.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -66,7 +66,7 @@ jobs:
     # A normal run takes under 10 minutes; a stuck simulator would otherwise hold the runner for hours.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # The Swift 6.0 compiler builds and tests every target. A macOS build needs no extra platform,
       # so Xcode 16.0 works as installed on the runner.
@@ -100,6 +100,6 @@ jobs:
         swift: ['6.0', 'latest']
     container: swift:${{ matrix.swift }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Test
         run: swift test
