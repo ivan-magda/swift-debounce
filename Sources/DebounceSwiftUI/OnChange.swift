@@ -23,7 +23,8 @@ extension View {
     ///   properties.
     /// - The work lives as long as the view: when SwiftUI removes the view or its identity
     ///   changes, the pending value is dropped and the running action is cancelled. While the view
-    ///   is only covered, for example by a pushed screen, the work goes on.
+    ///   is only covered, for example by a pushed screen, work that already started goes on. New
+    ///   changes arrive when SwiftUI updates the view, just like with `onChange(of:initial:_:)`.
     ///
     /// - Parameters:
     ///   - value: The value to watch.

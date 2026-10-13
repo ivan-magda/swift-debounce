@@ -181,6 +181,26 @@ struct HostedOnChangeTests {
         #expect(await eventually { screen.events == ["v1 ->S"] })
     }
 
+    /// SwiftUI doesn't update a view covered by a pushed screen, so its `onChange` (and ours, which
+    /// is built on it) sees changes made meanwhile only when the view is shown again.
+    @available(iOS 17, tvOS 17, visionOS 1, *)
+    @Test func changesWhileCoveredArriveWhenTheViewIsShownAgain() async {
+        let screen = Screen()
+        let host = Host(Root(screen: screen))
+        defer { host.close() }
+        await pause(milliseconds: 100)
+
+        screen.path.append(1)
+        await pause(milliseconds: 800)
+        screen.query = "y"
+        await pause(milliseconds: 20)
+        screen.query = "yz"
+        await pause(milliseconds: 800)
+        #expect(screen.events.isEmpty, "SwiftUI holds the changes back while the view is covered")
+        screen.path.removeAll()
+        #expect(await eventually { screen.events.last == "v1 ->yz" }, "the latest value arrives after the pop")
+    }
+
     @available(iOS 17, tvOS 17, visionOS 1, *)
     @Test func actionUsesTheClosureFromTheLatestUpdate() async {
         let screen = Screen()

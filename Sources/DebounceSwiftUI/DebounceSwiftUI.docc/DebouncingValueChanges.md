@@ -12,11 +12,13 @@ struct SearchView: View {
     @State private var results: [String] = []
 
     var body: some View {
-        List(results, id: \.self) { Text($0) }
-            .searchable(text: $query)
-            .onChange(of: query, debounce: .milliseconds(300)) { _, newValue in
-                results = await SearchService.shared.search(newValue)
-            }
+        NavigationStack {
+            List(results, id: \.self) { Text($0) }
+                .searchable(text: $query)
+                .onChange(of: query, debounce: .milliseconds(300)) { _, newValue in
+                    results = await SearchService.shared.search(newValue)
+                }
+        }
     }
 }
 ```
@@ -54,7 +56,8 @@ The first `oldValue` is the value the view had when it appeared. A cancelled act
 
 The work is tied to the view's identity, the same way SwiftUI ties `task` to it:
 
-- While the view exists, changes are delivered. That includes the time it's covered by a pushed screen or sits in another tab.
+- While the view exists, its work goes on. A search that's already waiting or running finishes even if the user pushes another screen on top.
+- New changes arrive the way they do for SwiftUI's own `onChange`: when SwiftUI updates the view. SwiftUI doesn't update a view that a pushed screen covers, so changes made meanwhile arrive when the view is shown again, and only the latest value counts.
 - When SwiftUI removes the view, for example when a sheet closes or an `if` branch changes, or when the view gets a new identity through `id(_:)`, the pending value is dropped and the running action is cancelled.
 
 Cancellation is cooperative: a running action stops at its next cancellation check, such as an `await` on a cancellable call or `Task.checkCancellation()`.

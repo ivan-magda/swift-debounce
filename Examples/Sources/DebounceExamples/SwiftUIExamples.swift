@@ -23,26 +23,26 @@ public struct SearchView: View {
     }
 }
 
-// Adapted from the DebounceSwiftUI documentation: on Return, search right away and cancel the
-// pending search.
+// DebounceSwiftUI documentation: on Return, search right away and cancel the pending search.
 public struct SubmittingSearchView: View {
     @State private var query = ""
+    @State private var results: [String] = []
     @State private var search = PacingHandle()
-    let model: SearchModel
 
-    public init(model: SearchModel) {
-        self.model = model
-    }
+    public init() {}
 
     public var body: some View {
-        TextField("Search", text: $query)
-            .onChange(of: query, debounce: .milliseconds(300), handle: search) { _, newValue in
-                model.query = newValue
-            }
-            .onSubmit {
-                search.cancel()
-                model.query = query
-            }
+        NavigationStack {
+            List(results, id: \.self) { Text($0) }
+                .searchable(text: $query)
+                .onChange(of: query, debounce: .milliseconds(300), handle: search) { _, newValue in
+                    results = await SearchService.shared.search(newValue)
+                }
+                .onSubmit(of: .search) {
+                    search.cancel()
+                    Task { results = await SearchService.shared.search(query) }
+                }
+        }
     }
 }
 
