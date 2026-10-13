@@ -33,10 +33,12 @@ jobs:
             -destination "generic/platform=macOS" \
             -derivedDataPath .derivedData
 
-          # One site for both modules: /documentation/debounce/ and /documentation/debounceswiftui/.
+          # One site for both modules: /documentation/debounce/ and /documentation/debounceswiftui/,
+          # with a landing page at /documentation/ that links to both.
           archives=.derivedData/Build/Products/Debug
           docc=$(xcrun --find docc)
           "$docc" merge "$archives/Debounce.doccarchive" "$archives/DebounceSwiftUI.doccarchive" \
+            --synthesized-landing-page-name swift-debounce \
             --output-path Combined.doccarchive
           "$docc" process-archive transform-for-static-hosting Combined.doccarchive \
             --hosting-base-path swift-debounce \
