@@ -33,7 +33,9 @@ final class _LockedStorage<State>: ManagedBuffer<State, _PlatformLock> {
     @inlinable
     static func create(_ initial: sending State) -> _LockedStorage {
         let buffer = create(minimumCapacity: lockIndex + 1) { buffer in
-            buffer.withUnsafeMutablePointerToElements { _initializeLock($0 + lockIndex) }
+            buffer.withUnsafeMutablePointerToElements {
+              _initializeLock($0 + lockIndex)
+            }
             return initial
         }
         return unsafeDowncast(buffer, to: _LockedStorage.self)
@@ -50,7 +52,9 @@ final class _LockedStorage<State>: ManagedBuffer<State, _PlatformLock> {
     }
 
     deinit {
-        withUnsafeMutablePointerToElements { _destroyLock($0 + Self.lockIndex) }
+        withUnsafeMutablePointerToElements {
+          _destroyLock($0 + Self.lockIndex)
+        }
     }
 }
 
