@@ -20,6 +20,10 @@ final class Screen {
     var prefix = "v1"
     var path: [Int] = []
     var events: [String] = []
+    /// How many times a watching view appeared. Tests wait for it instead of sleeping: on a cold
+    /// CI simulator the first render can take long, and a value set before it is just the initial
+    /// value, not a change.
+    var appearances = 0
 }
 
 @available(iOS 17, tvOS 17, visionOS 1, *)
@@ -33,6 +37,7 @@ struct SearchField: View {
 
     var body: some View {
         Text(screen.query)
+            .onAppear { screen.appearances += 1 }
             .onChange(of: screen.query, debounce: interval, initial: initial, handle: handle) { old, new in
                 screen.events.append("\(prefix) \(old)->\(new)")
                 if slowAction {
@@ -89,11 +94,11 @@ final class Host {
 @Suite(.serialized, .tags(.timing))
 struct HostedOnChangeTests {
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func burstOfChangesRunsTheActionOnceWithTheLatestValue() async {
+    @Test func burstOfChangesRunsTheActionOnceWithTheLatestValue() async throws {
         let screen = Screen()
         let host = Host(Root(screen: screen))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         for query in ["S", "Sw", "Swi", "Swift"] {
             screen.query = query
@@ -108,11 +113,11 @@ struct HostedOnChangeTests {
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func removingTheViewDropsThePendingValue() async {
+    @Test func removingTheViewDropsThePendingValue() async throws {
         let screen = Screen()
         let host = Host(Root(screen: screen))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "S"
         await pause(milliseconds: 50)
@@ -126,7 +131,7 @@ struct HostedOnChangeTests {
         let screen = Screen()
         let host = Host(Root(screen: screen, interval: .milliseconds(50), slowAction: true))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "S"
         try #require(await eventually { screen.events == ["v1 ->S"] })
@@ -135,11 +140,11 @@ struct HostedOnChangeTests {
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func newIdentityDropsThePendingValueAndStartsOver() async {
+    @Test func newIdentityDropsThePendingValueAndStartsOver() async throws {
         let screen = Screen()
         let host = Host(Root(screen: screen))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "S"
         await pause(milliseconds: 50)
@@ -152,11 +157,11 @@ struct HostedOnChangeTests {
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func workGoesOnWhileAnotherScreenIsPushedOnTop() async {
+    @Test func workGoesOnWhileAnotherScreenIsPushedOnTop() async throws {
         let screen = Screen()
         let host = Host(Root(screen: screen))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "S"
         screen.path.append(1)
@@ -168,11 +173,11 @@ struct HostedOnChangeTests {
     /// anything arrives while covered is SwiftUI's call; the test only checks the package's part:
     /// the latest value is delivered once the view is back.
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func changesWhileCoveredArriveWhenTheViewIsShownAgain() async {
+    @Test func changesWhileCoveredArriveWhenTheViewIsShownAgain() async throws {
         let screen = Screen()
         let host = Host(Root(screen: screen))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.path.append(1)
         await pause(milliseconds: 1_500) // let the push finish
@@ -185,11 +190,11 @@ struct HostedOnChangeTests {
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func actionUsesTheClosureFromTheLatestUpdate() async {
+    @Test func actionUsesTheClosureFromTheLatestUpdate() async throws {
         let screen = Screen()
         let host = Host(Root(screen: screen))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "S"
         await pause(milliseconds: 50)
@@ -198,12 +203,12 @@ struct HostedOnChangeTests {
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func handleCancelsThePendingValue() async {
+    @Test func handleCancelsThePendingValue() async throws {
         let screen = Screen()
         let handle = PacingHandle()
         let host = Host(Root(screen: screen, handle: handle))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "S"
         await pause(milliseconds: 50)
@@ -216,7 +221,7 @@ struct HostedOnChangeTests {
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func initialRunsWhenTheViewAppears() async {
+    @Test func initialRunsWhenTheViewAppears() async throws {
         let screen = Screen()
         screen.query = "Swift"
         let host = Host(Root(screen: screen, initial: true))
@@ -225,12 +230,13 @@ struct HostedOnChangeTests {
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
-    @Test func throttleRunsTheFirstChangeRightAwayAndTheLatestAtTheEnd() async {
+    @Test func throttleRunsTheFirstChangeRightAwayAndTheLatestAtTheEnd() async throws {
         let screen = Screen()
         struct Slider: View {
             let screen: Screen
             var body: some View {
                 Text(screen.query)
+                    .onAppear { screen.appearances += 1 }
                     .onChange(of: screen.query, throttle: .seconds(1)) { _, new in
                         screen.events.append(new)
                     }
@@ -238,7 +244,7 @@ struct HostedOnChangeTests {
         }
         let host = Host(Slider(screen: screen))
         defer { host.close() }
-        await pause(milliseconds: 100)
+        try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "1"
         // Well before the 1 s interval: a trailing-only throttle would wait for it.

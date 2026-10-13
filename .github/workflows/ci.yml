@@ -47,7 +47,8 @@ jobs:
       # `swift test` on macOS can't drive SwiftUI updates, so the modifier's end-to-end tests run
       # with real views on the iOS Simulator.
       - name: Test the SwiftUI modifier on the iOS Simulator
-        run: xcodebuild test -quiet -scheme swift-debounce-Package -destination "id=$SIMULATOR" -only-testing:DebounceSwiftUITests
+        # Not -quiet: it hides which expectation failed.
+        run: xcodebuild test -scheme swift-debounce-Package -destination "id=$SIMULATOR" -only-testing:DebounceSwiftUITests
 
       - name: Run the README examples on the iOS Simulator
         working-directory: Examples
