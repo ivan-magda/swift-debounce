@@ -121,7 +121,15 @@ import Testing
         m.recordStart(now: 150)
         _ = m.send("c", now: 170) // a value already waits, so the newer one replaces it
         #expect(m.next(now: 180) == .sleep(until: 250))
-        #expect(m.next(now: 250) == .run("c"))
+        _ = m.send("d", now: 200) // "a" has returned, and the waiting value is still replaced
+        #expect(m.next(now: 250) == .run("d"))
+    }
+
+    @Test func leadingOnlyKeepsTheFirstValueWhenTheWorkerHasntStartedYet() {
+        var m = machine(.leading)
+        #expect(m.send("a", now: 0) == true)
+        _ = m.send("b", now: 0) // sent before the new worker asks the machine
+        #expect(m.next(now: 1) == .run("a"))
     }
 
     @Test func trailingOnlyValueSentWhileTheStartIsLateWaitsAFullInterval() {

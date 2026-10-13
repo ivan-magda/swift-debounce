@@ -166,9 +166,10 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
 
     @inlinable
     mutating func send(_ value: Value, now: UInt64) -> Bool {
-        if let end = windowEnd, isRunning, now >= end || readyValue != nil {
-            // The window ended while a slow action still runs, or a value already waits for it to
-            // return. The next start can only happen when it returns, so keep just the latest value.
+        if let end = windowEnd, (isRunning && now >= end) || (readyValue != nil && now < earliestStart) {
+            // The window ended while a slow action still runs, or a value already waits for a
+            // full interval after a late start. Either way the next start comes later, so keep
+            // just the latest value for it.
             if edges.contains(.trailing) {
                 trailingValue = value
             } else {
