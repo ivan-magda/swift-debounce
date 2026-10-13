@@ -152,7 +152,8 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
         handledSequence = change.sequence
     }
 
-    static func livePacer(
+    // Nonisolated: it's the default argument of the nonisolated `init`, which Swift 6.0 checks.
+    nonisolated static func livePacer(
         _ configuration: _PacingConfiguration,
         deliver: @escaping Deliver
     ) -> any _ChangePacer<_Change<Value>> {
