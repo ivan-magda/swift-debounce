@@ -82,11 +82,13 @@ final class Host {
     }
 }
 
+@available(iOS 17, tvOS 17, visionOS 1, *)
 func pause(milliseconds: Int) async {
     try? await Task.sleep(for: .milliseconds(milliseconds))
 }
 
 /// Waits until `condition` holds or the timeout passes.
+@available(iOS 17, tvOS 17, visionOS 1, *)
 @MainActor
 func eventually(timeout milliseconds: Int = 3_000, _ condition: () -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + .milliseconds(milliseconds)
