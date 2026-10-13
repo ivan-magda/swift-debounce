@@ -47,9 +47,12 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
     private var action: Action?
     private var pacer: (any _ChangePacer<_Change<Value>>)?
     private weak var handle: PacingHandle?
-    /// Keeps actions from overlapping when the configuration changes and a new pacer starts while
-    /// the old pacer's cancelled action is still running.
-    private let gate = _ActionGate()
+    /// True while the user's action runs. Actions never overlap, so at most one runs at a time.
+    private var isActionRunning = false
+    /// The configuration changed while an action of the old pacer was still running. Until it
+    /// returns, changes are only recorded: the new pacer gets just the latest one afterwards, so
+    /// its timing starts then and an outdated value never runs after the old action.
+    private var isWaitingForThePreviousAction = false
 
     /// The value of the last action that finished without being cancelled: the next `oldValue`.
     private var handled: Value?
@@ -87,8 +90,11 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
             if let old = pacer {
                 old.cancel()
                 pacer = nil
-                if latestSequence > max(handledSequence, dismissedSequence), let latest {
-                    currentPacer().send(_Change(sequence: latestSequence, value: latest))
+
+                if isActionRunning {
+                    isWaitingForThePreviousAction = true
+                } else {
+                    sendUnhandledChange()
                 }
             }
         }
@@ -98,6 +104,11 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
     func changed(to value: Value) {
         latestSequence += 1
         latest = value
+
+        guard !isWaitingForThePreviousAction else {
+          return
+        }
+
         currentPacer().send(_Change(sequence: latestSequence, value: value))
     }
 
@@ -116,10 +127,7 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
             preconditionFailure("update(value:configuration:handle:action:) runs before the first change")
         }
 
-        let gate = gate
         let pacer = makePacer(configuration) { [weak self] change in
-            await gate.enter()
-            defer { gate.leave() }
             // Take what the action needs and let go of `self` before awaiting it.
             guard !Task.isCancelled, let (action, oldValue) = self?.begin() else {
               return
@@ -127,9 +135,7 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
 
             await action(oldValue, change.value)
 
-            if !Task.isCancelled {
-                self?.finish(change)
-            }
+            self?.end(change, finished: !Task.isCancelled)
         }
         self.pacer = pacer
 
@@ -140,16 +146,33 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
         guard let action, let handled else {
           return nil
         }
+
+        isActionRunning = true
+
         return (action, handled)
     }
 
-    private func finish(_ change: _Change<Value>) {
-        guard change.sequence > handledSequence else {
+    private func end(_ change: _Change<Value>, finished: Bool) {
+        isActionRunning = false
+
+        if finished, change.sequence > handledSequence {
+            handled = change.value
+            handledSequence = change.sequence
+        }
+
+        if isWaitingForThePreviousAction {
+            isWaitingForThePreviousAction = false
+            sendUnhandledChange()
+        }
+    }
+
+    /// Sends the latest change to the current pacer, unless it was handled or cancelled already.
+    private func sendUnhandledChange() {
+        guard latestSequence > max(handledSequence, dismissedSequence), let latest else {
           return
         }
 
-        handled = change.value
-        handledSequence = change.sequence
+        currentPacer().send(_Change(sequence: latestSequence, value: latest))
     }
 
     // Nonisolated: it's the default argument of the nonisolated `init`, which Swift 6.0 checks.
@@ -162,32 +185,6 @@ final class _ChangePacingState<Value: Equatable & Sendable> {
             Debouncer(for: configuration.interval, edges: configuration.edges, action: deliver)
         case .throttle:
             Throttler(for: configuration.interval, edges: configuration.edges, action: deliver)
-        }
-    }
-}
-
-/// Lets one action run at a time, in arrival order. Everything runs on the main actor.
-@MainActor
-final class _ActionGate {
-    private var isBusy = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    nonisolated init() {}
-
-    func enter() async {
-        guard isBusy else {
-            isBusy = true
-            return
-        }
-        // `leave()` hands the gate over to the first waiter without opening it.
-        await withCheckedContinuation { waiters.append($0) }
-    }
-
-    func leave() {
-        if waiters.isEmpty {
-            isBusy = false
-        } else {
-            waiters.removeFirst().resume()
         }
     }
 }

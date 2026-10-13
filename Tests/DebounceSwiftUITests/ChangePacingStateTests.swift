@@ -184,38 +184,65 @@ final class Calls<Value: Sendable> {
         #expect(factory.pacers.isEmpty)
     }
 
+    /// A new pacer only gets the latest change, and only once the old pacer's action returned, even
+    /// if that action ignores cancellation. Otherwise an outdated value would run after it, and a
+    /// throttle's window would start too early.
     @available(macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1, *)
     @Test func newPacerWaitsForTheActionOfTheOldOne() async throws {
         let factory = FakePacerFactory<Int>()
         let state = factory.makeState()
         var events: [String] = []
         var release: CheckedContinuation<Void, Never>?
-        state.update(value: 0, configuration: debounce300, handle: nil) { _, new in
+        let action: @MainActor (Int, Int) async -> Void = { _, new in
             events.append("start \(new)")
             // The first action ignores cancellation and runs until the test releases it.
-            if new == 1 { await withCheckedContinuation { release = $0 } }
+            if release == nil { await withCheckedContinuation { release = $0 } }
             events.append("end \(new)")
         }
-
+        state.update(value: 0, configuration: debounce300, handle: nil, action: action)
         state.changed(to: 1)
         let old = try #require(factory.last)
         let oldAction = Task { await old.deliver(old.sent[0]) }
         while release == nil { await Task.yield() }
 
+        state.update(value: 1, configuration: throttle100, handle: nil, action: action)
         state.changed(to: 2)
-        state.update(value: 2, configuration: throttle100, handle: nil) { _, new in
-            events.append("start \(new)")
-            events.append("end \(new)")
-        }
-        let new = try #require(factory.last)
-        let newAction = Task { await new.deliver(new.sent[0]) }
-        for _ in 0..<10 { await Task.yield() }
-        #expect(events == ["start 1"], "the new action waits while the old one runs")
+        state.changed(to: 3)
+        #expect(old.cancelCount == 1)
+        #expect(factory.pacers.count == 1, "no new pacer while the old action runs")
 
         release?.resume()
         await oldAction.value
-        await newAction.value
-        #expect(events == ["start 1", "end 1", "start 2", "end 2"])
+        let new = try #require(factory.pacers.last)
+        #expect(new !== old)
+        #expect(new.sent.map(\.value) == [3], "only the latest change goes to the new pacer")
+
+        await new.deliver(new.sent[0])
+        #expect(events == ["start 1", "end 1", "start 3", "end 3"])
+    }
+
+    @available(macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1, *)
+    @Test func changeCancelledWhileWaitingForTheOldActionIsNotDelivered() async throws {
+        let factory = FakePacerFactory<Int>()
+        let state = factory.makeState()
+        let handle = PacingHandle()
+        var release: CheckedContinuation<Void, Never>?
+        let action: @MainActor (Int, Int) async -> Void = { _, _ in
+            if release == nil { await withCheckedContinuation { release = $0 } }
+        }
+        state.update(value: 0, configuration: debounce300, handle: handle, action: action)
+        state.changed(to: 1)
+        let old = try #require(factory.last)
+        let oldAction = Task { await old.deliver(old.sent[0]) }
+        while release == nil { await Task.yield() }
+        state.update(value: 1, configuration: throttle100, handle: handle, action: action)
+        state.changed(to: 2)
+
+        handle.cancel()
+        release?.resume()
+        await oldAction.value
+
+        #expect(factory.pacers.count == 1, "the cancelled change isn't sent to a new pacer")
     }
 
     @available(macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1, *)

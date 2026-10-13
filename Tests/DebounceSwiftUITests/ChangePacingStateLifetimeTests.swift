@@ -59,6 +59,36 @@ struct ChangePacingStateLifetimeTests {
         #expect(!probe.ran)
     }
 
+    /// S2 and S7 with the real `Debouncer`: when the interval changes while an action that ignores
+    /// cancellation still runs, values that become due meanwhile collapse into the latest one.
+    @available(macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1, *)
+    @Test func newIntervalWhileAnActionRunsDeliversOnlyTheLatestValue() async throws {
+        final class Box {
+            var release: CheckedContinuation<Void, Never>?
+            var finished: [Int] = []
+        }
+        let box = Box()
+        let state = _ChangePacingState<Int>()
+        let action: @MainActor (Int, Int) async -> Void = { _, new in
+            if box.release == nil { await withCheckedContinuation { box.release = $0 } }
+            box.finished.append(new)
+        }
+        state.update(value: 0, configuration: Self.configuration(milliseconds: 10), handle: nil, action: action)
+        state.changed(to: 1)
+        try #require(await eventually { box.release != nil })
+
+        state.update(value: 1, configuration: Self.configuration(milliseconds: 20), handle: nil, action: action)
+        state.changed(to: 2)
+        await pause(milliseconds: 100) // 2 would be due by now
+        state.changed(to: 3)
+        await pause(milliseconds: 100) // and so would 3
+        box.release?.resume()
+
+        #expect(await eventually { box.finished == [1, 3] })
+        await pause(milliseconds: 200)
+        #expect(box.finished == [1, 3], "the outdated value never runs")
+    }
+
     /// S10: the same guarantee for `PacingHandle.cancel()`.
     @available(macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1, *)
     @Test func handleCancelStopsAnActionThatWasAboutToStart() async {
