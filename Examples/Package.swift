@@ -11,7 +11,10 @@ let package = Package(
         .package(name: "swift-debounce", path: ".."),
     ],
     targets: [
-        .target(name: "DebounceExamples", dependencies: [.product(name: "Debounce", package: "swift-debounce")]),
+        .target(name: "DebounceExamples", dependencies: [
+            .product(name: "Debounce", package: "swift-debounce"),
+            .product(name: "DebounceSwiftUI", package: "swift-debounce"),
+        ]),
         .testTarget(name: "DebounceExamplesTests", dependencies: ["DebounceExamples"]),
     ]
 )

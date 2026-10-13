@@ -28,12 +28,16 @@ jobs:
       - name: Build documentation
         run: |
           xcodebuild docbuild \
-            -scheme swift-debounce \
+            -scheme swift-debounce-Package \
             -destination "generic/platform=macOS" \
             -derivedDataPath .derivedData
 
-          $(xcrun --find docc) process-archive transform-for-static-hosting \
-            .derivedData/Build/Products/Debug/Debounce.doccarchive \
+          # One site for both modules: /documentation/debounce/ and /documentation/debounceswiftui/.
+          archives=.derivedData/Build/Products/Debug
+          docc=$(xcrun --find docc)
+          "$docc" merge "$archives/Debounce.doccarchive" "$archives/DebounceSwiftUI.doccarchive" \
+            --output-path Combined.doccarchive
+          "$docc" process-archive transform-for-static-hosting Combined.doccarchive \
             --hosting-base-path swift-debounce \
             --output-path ./docs
 

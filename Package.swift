@@ -12,10 +12,13 @@ let package = Package(
     ],
     products: [
         .library(name: "Debounce", targets: ["Debounce"]),
+        .library(name: "DebounceSwiftUI", targets: ["DebounceSwiftUI"]),
     ],
     targets: [
         .target(name: "Debounce"),
+        .target(name: "DebounceSwiftUI", dependencies: ["Debounce"]),
         .testTarget(name: "DebounceTests", dependencies: ["Debounce"]),
         .testTarget(name: "DebounceE2ETests", dependencies: ["Debounce"]),
+        .testTarget(name: "DebounceSwiftUITests", dependencies: ["DebounceSwiftUI"]),
     ]
 )

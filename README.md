@@ -28,8 +28,9 @@ Most debounce code in Swift creates and cancels a `Task` for every value. That w
 - **Strict order.** Your action never runs concurrently with itself, so a slow request for "Sw" can't overwrite the results for "Swift".
 - **Safe cancellation.** `cancel()` and `deinit` drop the pending value. Cancel on the main actor, and a main-actor action that hasn't started yet never starts.
 - **Debounce and throttle with the same rules.**
+- **A SwiftUI modifier.** `onChange(of:debounce:)` and `onChange(of:throttle:)` in the `DebounceSwiftUI` product, with work that ends when the view goes away.
 
-If you only need to debounce a SwiftUI search field, `.task(id: query) { try? await Task.sleep(for: .seconds(0.3)); ... }` may be all you need. Reach for this package when values arrive often, when you have many debouncers, or when the code that produces values isn't async.
+If you only need to debounce a SwiftUI search field and nothing else, `.task(id: query) { try? await Task.sleep(for: .seconds(0.3)); ... }` may be all you need. Reach for this package when you need a throttle, when two searches must never overlap, when values arrive often, or when the code that produces values isn't async.
 
 ## Debounce or throttle?
 
@@ -55,16 +56,18 @@ In `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ivan-magda/swift-debounce", from: "0.1.0"),
+    .package(url: "https://github.com/ivan-magda/swift-debounce", from: "0.2.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
         .product(name: "Debounce", package: "swift-debounce"),
+        // For the SwiftUI modifiers. It also brings in Debounce.
+        .product(name: "DebounceSwiftUI", package: "swift-debounce"),
     ]),
 ]
 ```
 
-Requirements: Swift 6.0 (Xcode 16) or later. iOS 13, macOS 10.15, tvOS 13, watchOS 6, visionOS 1, or Linux. The `Duration`-based initializers need iOS 16, macOS 13, tvOS 16, or watchOS 9; on older systems, pass seconds as a `TimeInterval`.
+Requirements: Swift 6.0 (Xcode 16) or later. iOS 13, macOS 10.15, tvOS 13, watchOS 6, visionOS 1, or Linux. The `Duration`-based initializers need iOS 16, macOS 13, tvOS 16, or watchOS 9; on older systems, pass seconds as a `TimeInterval`. `DebounceSwiftUI` needs iOS 17, macOS 14, tvOS 17, watchOS 10, or visionOS 1.
 
 ## Usage
 
@@ -121,7 +124,30 @@ final class CheckoutViewController: UIViewController, UIScrollViewDelegate {
 
 ### SwiftUI
 
-Keep the debouncer in your model, not in the view. SwiftUI can create a view struct many times, and every copy would get a new debouncer.
+Debounce a value right where the view uses it:
+
+```swift
+import DebounceSwiftUI
+
+struct SearchView: View {
+    @State private var query = ""
+    @State private var results: [String] = []
+
+    var body: some View {
+        NavigationStack {
+            List(results, id: \.self) { Text($0) }
+                .searchable(text: $query)
+                .onChange(of: query, debounce: .milliseconds(300)) { _, newValue in
+                    results = await SearchService.shared.search(newValue)
+                }
+        }
+    }
+}
+```
+
+`onChange(of:throttle:)` works the same way for values that change continuously, like a slider. The action runs on the main actor and never concurrently with itself. When SwiftUI removes the view, the pending value is dropped and the running action is cancelled. To cancel the pending work yourself, for example when the user presses Return, pass a `PacingHandle`. See [Debouncing value changes in SwiftUI](https://ivan-magda.github.io/swift-debounce/documentation/debounceswiftui/debouncingvaluechanges) for the details.
+
+If the logic belongs to your model, or you support iOS 16 and earlier, keep the debouncer in the model instead. Don't store it in the view: SwiftUI can create a view struct many times, and every copy would get a new debouncer.
 
 ```swift
 import Debounce

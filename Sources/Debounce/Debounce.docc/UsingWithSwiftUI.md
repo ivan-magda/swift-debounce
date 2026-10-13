@@ -1,10 +1,25 @@
 # Using with SwiftUI
 
-Keep the debouncer in an observable model and send values from property observers.
+Debounce a value in the view with a modifier, or keep the debouncer in an observable model.
 
-## Search as the user types
+## Debounce in the view
 
-SwiftUI can create a view struct many times, and every copy of a debouncer stored in the view would start over. Keep the debouncer in your model instead:
+The `DebounceSwiftUI` product adds `onChange(of:debounce:)` and `onChange(of:throttle:)`. They're the shortest way to debounce a value that a view owns, and the work ends when the view goes away:
+
+```swift
+import DebounceSwiftUI
+
+TextField("Search", text: $query)
+    .onChange(of: query, debounce: .milliseconds(300)) { _, newValue in
+        results = await SearchService.shared.search(newValue)
+    }
+```
+
+They need iOS 17, macOS 14, tvOS 17, watchOS 10, or visionOS 1. See the `DebounceSwiftUI` documentation for the full rules.
+
+## Search as the user types, in the model
+
+Keep the debouncer in your model when the logic belongs there: you can test it without a view, and it reacts to every change of the property, not only to the ones made through the UI. Don't store a debouncer in the view itself: SwiftUI can create a view struct many times, and every copy would start over.
 
 ```swift
 import Debounce
