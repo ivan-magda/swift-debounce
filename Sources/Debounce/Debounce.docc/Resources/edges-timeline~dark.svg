@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 300" width="820" height="300" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="17">
+<rect width="820" height="300" fill="#1c1c1e"/>
+<text x="20" y="55" fill="#f5f5f7" font-weight="600">Values you send</text>
+<line x1="250" y1="50" x2="800" y2="50" stroke="#a1a1a6" stroke-width="1"/>
+<line x1="250.0" y1="38" x2="250.0" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="289.2857142857143" y1="38" x2="289.2857142857143" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="318.75" y1="38" x2="318.75" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="338.3928571428571" y1="38" x2="338.3928571428571" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="397.32142857142856" y1="38" x2="397.32142857142856" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="416.96428571428567" y1="38" x2="416.96428571428567" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="436.6071428571429" y1="38" x2="436.6071428571429" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="456.25" y1="38" x2="456.25" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="475.8928571428571" y1="38" x2="475.8928571428571" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="623.2142857142858" y1="38" x2="623.2142857142858" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="662.5" y1="38" x2="662.5" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<line x1="682.1428571428571" y1="38" x2="682.1428571428571" y2="62" stroke="#64d2ff" stroke-width="3"/>
+<text x="20" y="115" fill="#f5f5f7" font-weight="600">Debouncer, trailing</text>
+<line x1="250" y1="110" x2="800" y2="110" stroke="#a1a1a6" stroke-width="1"/>
+<circle cx="574.1071428571429" cy="110" r="8" fill="#30d158"/>
+<line x1="475.8928571428571" y1="62" x2="574.1071428571429" y2="101" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<circle cx="780.3571428571428" cy="110" r="8" fill="#30d158"/>
+<line x1="682.1428571428571" y1="62" x2="780.3571428571428" y2="101" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<text x="20" y="175" fill="#f5f5f7" font-weight="600">Debouncer, leading</text>
+<line x1="250" y1="170" x2="800" y2="170" stroke="#a1a1a6" stroke-width="1"/>
+<circle cx="250.0" cy="170" r="8" fill="#30d158"/>
+<line x1="250.0" y1="62" x2="250.0" y2="161" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<circle cx="623.2142857142858" cy="170" r="8" fill="#30d158"/>
+<line x1="623.2142857142858" y1="62" x2="623.2142857142858" y2="161" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<text x="20" y="235" fill="#f5f5f7" font-weight="600">Throttler, both edges</text>
+<line x1="250" y1="230" x2="800" y2="230" stroke="#a1a1a6" stroke-width="1"/>
+<circle cx="250.0" cy="230" r="8" fill="#30d158"/>
+<line x1="250.0" y1="62" x2="250.0" y2="221" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<circle cx="348.2142857142857" cy="230" r="8" fill="#30d158"/>
+<line x1="338.3928571428571" y1="62" x2="348.2142857142857" y2="221" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<circle cx="446.42857142857144" cy="230" r="8" fill="#30d158"/>
+<line x1="436.6071428571429" y1="62" x2="446.42857142857144" y2="221" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<circle cx="544.6428571428571" cy="230" r="8" fill="#30d158"/>
+<line x1="475.8928571428571" y1="62" x2="544.6428571428571" y2="221" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<circle cx="642.8571428571429" cy="230" r="8" fill="#30d158"/>
+<line x1="623.2142857142858" y1="62" x2="642.8571428571429" y2="221" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<circle cx="741.0714285714286" cy="230" r="8" fill="#30d158"/>
+<line x1="682.1428571428571" y1="62" x2="741.0714285714286" y2="221" stroke="#30d158" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+<text x="250" y="280" fill="#a1a1a6">Interval: 100 ms. Each green dot runs the action with the value its dashed line points to.</text>
+</svg>

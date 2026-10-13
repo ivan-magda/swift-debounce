@@ -1,0 +1,13 @@
+.DS_Store
+/.build
+/Packages
+/*.xcodeproj
+xcuserdata/
+DerivedData/
+.swiftpm/
+.netrc
+Package.resolved
+!Benchmarks/Package.resolved
+Benchmarks/.build
+Examples/**/.build
+/docs

@@ -1,0 +1,60 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # xcodebuild docbuild needs no swift-docc-plugin, so the root manifest stays free of dependencies.
+      - name: Build documentation
+        run: |
+          xcodebuild docbuild \
+            -scheme swift-debounce \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath .derivedData
+
+          $(xcrun --find docc) process-archive transform-for-static-hosting \
+            .derivedData/Build/Products/Debug/Debounce.doccarchive \
+            --hosting-base-path swift-debounce \
+            --output-path ./docs
+
+      - name: Add redirect
+        run: |
+          cat > ./docs/index.html << 'EOF'
+          <!DOCTYPE html><html><head>
+            <meta http-equiv="refresh" content="0; url=documentation/debounce/">
+          </head></html>
+          EOF
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
