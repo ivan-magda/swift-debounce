@@ -12,18 +12,18 @@ extension TimingTests {
             var searches: [String] = []
             var searchedOnMain = true
             // Created inside a @MainActor function: the closure inherits the main actor, so it can
-            // touch main-actor state without annotations. 1 s quiet period against 10 ms typing:
-            // under Thread Sanitizer a busy CI runner overslept 0.3 s and split the burst.
-            let search = Debouncer(for: 1) { (query: String) in
+            // touch main-actor state without annotations.
+            let search = Debouncer(for: 0.3) { (query: String) in
                 searchedOnMain = checkMainActor()
                 searches.append(query)
             }
+            // The whole burst in one main-actor turn. Awaiting between sends let a busy CI runner
+            // resume this test more than 1 s late and split the burst; other tests cover the timing.
             for prefix in ["S", "Sw", "Swi", "Swif", "Swift"] {
                 search.send(prefix)
-                await sleep(milliseconds: 10)
             }
-            #expect(await eventually(timeout: 4_000) { searches == ["Swift"] })
-            await sleep(milliseconds: 1_200)
+            #expect(await eventually { searches == ["Swift"] })
+            await sleep(milliseconds: 500)
             #expect(searches == ["Swift"], "no extra searches")
             #expect(searchedOnMain)
         }
