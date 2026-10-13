@@ -8,7 +8,7 @@ In Xcode, choose **File > Add Package Dependencies** and enter `https://github.c
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ivan-magda/swift-debounce", from: "0.1.0"),
+    .package(url: "https://github.com/ivan-magda/swift-debounce", from: "1.0.0"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [

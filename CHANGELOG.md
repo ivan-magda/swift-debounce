@@ -5,7 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-13
+## [1.0.0] - 2026-10-13
+
+The first stable release. From here on, the public API follows Semantic Versioning.
 
 ### Added
 
@@ -22,6 +24,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `cancel()`; releasing a debouncer or throttler cancels it too.
 - Initializers that take a `Duration` (iOS 16, macOS 13 and later) or a `TimeInterval`.
 
-[Unreleased]: https://github.com/ivan-magda/swift-debounce/compare/0.2.0...HEAD
-[0.2.0]: https://github.com/ivan-magda/swift-debounce/compare/0.1.0...0.2.0
+[Unreleased]: https://github.com/ivan-magda/swift-debounce/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/ivan-magda/swift-debounce/compare/0.1.0...1.0.0
 [0.1.0]: https://github.com/ivan-magda/swift-debounce/releases/tag/0.1.0
