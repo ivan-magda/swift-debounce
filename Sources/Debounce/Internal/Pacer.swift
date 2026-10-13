@@ -61,9 +61,15 @@ final class _PacerCore<Machine: _PacingMachine>: Sendable {
         while true {
             let now = _MonotonicClock.now()
             let step: _Step<Machine.Value> = storage.withLock { state in
-                guard state.generation == generation else { return .exit }
+                guard state.generation == generation else {
+                  return .exit
+                }
+
                 let step = state.machine.next(now: now)
-                if case .exit = step { state.worker = nil }
+                if case .exit = step {
+                  state.worker = nil
+                }
+
                 return step
             }
 
@@ -83,7 +89,9 @@ final class _PacerCore<Machine: _PacingMachine>: Sendable {
                 }
             case .run(let value):
                 let isCurrent: @Sendable () -> Bool = { [self] in
-                    storage.withLock { $0.generation == generation }
+                    storage.withLock {
+                      $0.generation == generation
+                    }
                 }
 
                 switch action {
