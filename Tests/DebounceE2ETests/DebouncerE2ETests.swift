@@ -95,16 +95,19 @@ extension TimingTests {
             #expect(values.values.isEmpty)
         }
 
-        @Test func cancelReachesTheRunningAction() async {
+        @Test func cancelReachesTheRunningAction() async throws {
+            let started = Recorder<Int>()
             let outcomes = Recorder<Bool>()
-            let debouncer = Debouncer(for: 0.01) { (_: Int) in
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            let debouncer = Debouncer(for: 0.01) { (value: Int) in
+                started.append(value)
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
                 outcomes.append(Task.isCancelled)
             }
             debouncer.send(1)
-            await sleep(milliseconds: 50)
+            try #require(await eventually { started.values == [1] })
             debouncer.cancel()
-            #expect(await eventually(timeout: 500) { outcomes.values == [true] })
+            // Without the cancel the action would sleep for 5 s.
+            #expect(await eventually(timeout: 2_000) { outcomes.values == [true] })
         }
 
         /// Rule R4: a cancel on the action's actor wins even if the worker was already on its way.
