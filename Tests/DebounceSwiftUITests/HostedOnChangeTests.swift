@@ -96,7 +96,9 @@ struct HostedOnChangeTests {
     @available(iOS 17, tvOS 17, visionOS 1, *)
     @Test func burstOfChangesRunsTheActionOnceWithTheLatestValue() async throws {
         let screen = Screen()
-        let host = Host(Root(screen: screen))
+        // The burst has three gaps; a stall in any of them that outlasts the interval splits it.
+        // CI simulators have stalled for over 1 s, so this test waits longer.
+        let host = Host(Root(screen: screen, interval: .seconds(3)))
         defer { host.close() }
         try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
@@ -104,12 +106,15 @@ struct HostedOnChangeTests {
             screen.query = query
             await pause(milliseconds: 20)
         }
-        #expect(await eventually { screen.events == ["v1 ->Swift"] })
+        #expect(await eventually(timeout: 8_000) { screen.events == ["v1 ->Swift"] })
         await pause(milliseconds: 1_500)
         #expect(screen.events == ["v1 ->Swift"], "nothing else runs")
 
         screen.query = "SwiftUI"
-        #expect(await eventually { screen.events.last == "v1 Swift->SwiftUI" }, "oldValue is the last handled value")
+        #expect(
+            await eventually(timeout: 8_000) { screen.events.last == "v1 Swift->SwiftUI" },
+            "oldValue is the last handled value"
+        )
     }
 
     @available(iOS 17, tvOS 17, visionOS 1, *)
