@@ -24,7 +24,8 @@ import Foundation
 ///
 /// The throttler follows a few rules:
 /// - Two starts of the action are always at least `interval` apart. The interval is measured from
-///   the start of each action.
+///   the moment each action starts on its actor, so a busy main actor that delays one start
+///   doesn't bring the next one closer.
 /// - The action never runs concurrently with itself. If it takes longer than the interval, the
 ///   next one starts as soon as it returns, with the latest value.
 /// - ``cancel()`` and `deinit` drop the pending value and cancel the running action. If they happen

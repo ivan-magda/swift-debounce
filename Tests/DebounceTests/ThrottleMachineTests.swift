@@ -100,6 +100,41 @@ import Testing
         #expect(m.next(now: 300) == .run("d"))
     }
 
+    // The action starts on its own actor. When that actor is busy, the start comes later than the
+    // `.run` step, and `recordStart(now:)` reports the real time.
+
+    @Test func lateStartMovesTheNextStartAFullIntervalAway() {
+        var m = machine()
+        _ = m.send("a", now: 0)
+        #expect(m.next(now: 0) == .run("a"))
+        _ = m.send("b", now: 10)
+        m.recordStart(now: 60) // the actor was busy until 60
+        #expect(m.next(now: 65) == .sleep(until: 160), "one interval from the real start, not from 0")
+        #expect(m.next(now: 160) == .run("b"))
+    }
+
+    @Test func leadingOnlyValueSentWhileTheStartIsLateWaitsAFullInterval() {
+        var m = machine(.leading)
+        _ = m.send("a", now: 0)
+        #expect(m.next(now: 0) == .run("a"))
+        _ = m.send("b", now: 120) // the window decided at 0 ended, but "a" hasn't started yet
+        m.recordStart(now: 150)
+        _ = m.send("c", now: 170) // a value already waits, so the newer one replaces it
+        #expect(m.next(now: 180) == .sleep(until: 250))
+        #expect(m.next(now: 250) == .run("c"))
+    }
+
+    @Test func trailingOnlyValueSentWhileTheStartIsLateWaitsAFullInterval() {
+        var m = machine(.trailing)
+        _ = m.send("a", now: 0)
+        #expect(m.next(now: 0) == .sleep(until: 100))
+        #expect(m.next(now: 100) == .run("a"))
+        _ = m.send("b", now: 110) // opens a window until 210 while "a" waits for its actor
+        m.recordStart(now: 180)
+        #expect(m.next(now: 185) == .sleep(until: 280))
+        #expect(m.next(now: 280) == .run("b"))
+    }
+
     @Test func resetDropsEverything() {
         var m = machine()
         _ = m.send("a", now: 0)

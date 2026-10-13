@@ -88,9 +88,17 @@ final class _PacerCore<Machine: _PacingMachine>: Sendable {
                     return // cancelled: `cancel()` already reset the state
                 }
             case .run(let value):
+                // Runs on the action's actor right before the call, so it also records when the
+                // action really starts: a busy actor can start it later than the machine decided.
                 let isCurrent: @Sendable () -> Bool = { [self] in
-                    storage.withLock {
-                      $0.generation == generation
+                    let now = _MonotonicClock.now()
+                    return storage.withLock { state in
+                        guard state.generation == generation else {
+                          return false
+                        }
+
+                        state.machine.recordStart(now: now)
+                        return true
                     }
                 }
 

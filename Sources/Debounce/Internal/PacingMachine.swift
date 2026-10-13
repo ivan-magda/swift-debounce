@@ -27,6 +27,13 @@ protocol _PacingMachine<Value>: Sendable {
     /// Called by the worker whenever no action is running.
     mutating func next(now: UInt64) -> _Step<Value>
 
+    /// Called on the action's actor right before the action starts, with the time it starts.
+    ///
+    /// The worker decides to run a value before it hops to that actor. When the actor is busy, for
+    /// example the main actor during a long layout pass, the action starts later than `next(now:)`
+    /// returned `.run`.
+    mutating func recordStart(now: UInt64)
+
     /// Drops every pending value and returns to idle.
     mutating func reset()
 }
@@ -113,6 +120,10 @@ struct _DebounceMachine<Value: Sendable>: _PacingMachine {
         return .exit
     }
 
+    /// Debounce doesn't space starts apart, so the real start time doesn't matter.
+    @inlinable
+    mutating func recordStart(now: UInt64) {}
+
     @inlinable
     mutating func reset() {
         burstDeadline = nil
@@ -144,6 +155,8 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
     /// True from the moment `next(now:)` returns `.run` until the worker calls it again,
     /// that is, while the action runs.
     @usableFromInline var isRunning = false
+    /// One interval after the last real start (see `recordStart(now:)`); no action starts before it.
+    @usableFromInline var earliestStart: UInt64 = 0
 
     @inlinable
     init(interval: UInt64, edges: TriggerEdges) {
@@ -153,9 +166,9 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
 
     @inlinable
     mutating func send(_ value: Value, now: UInt64) -> Bool {
-        if let end = windowEnd, now >= end, isRunning {
-            // The window ended while a slow action still runs. The next start can only happen
-            // when it returns, so keep just the latest value for that moment.
+        if let end = windowEnd, isRunning, now >= end || readyValue != nil {
+            // The window ended while a slow action still runs, or a value already waits for it to
+            // return. The next start can only happen when it returns, so keep just the latest value.
             if edges.contains(.trailing) {
                 trailingValue = value
             } else {
@@ -204,6 +217,12 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
     @inlinable
     mutating func next(now: UInt64) -> _Step<Value> {
         isRunning = false
+
+        if readyValue != nil, now < earliestStart {
+            // The previous action started late on its actor; keep a full interval from that start.
+            return .sleep(until: earliestStart)
+        }
+
         if let value = readyValue {
             readyValue = nil
             windowEnd = _deadline(after: now, adding: interval)
@@ -232,6 +251,16 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
         return .exit
     }
 
+    /// `next(now:)` opened the window when it decided to run the value. If the action's actor was
+    /// busy, the action starts later, so the window is moved to end one interval after the real start.
+    @inlinable
+    mutating func recordStart(now: UInt64) {
+        earliestStart = _deadline(after: now, adding: interval)
+        if let end = windowEnd {
+            windowEnd = max(end, earliestStart)
+        }
+    }
+
     @inlinable
     mutating func reset() {
         windowEnd = nil
@@ -239,5 +268,6 @@ struct _ThrottleMachine<Value: Sendable>: _PacingMachine {
         readyValue = nil
         isWorkerActive = false
         isRunning = false
+        earliestStart = 0
     }
 }
