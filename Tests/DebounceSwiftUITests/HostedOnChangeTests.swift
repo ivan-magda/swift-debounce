@@ -24,6 +24,9 @@ final class Screen {
     /// CI simulator the first render can take long, and a value set before it is just the initial
     /// value, not a change.
     var appearances = 0
+    /// The query as the watching view last saw it in a plain `onChange`, that is, once SwiftUI has
+    /// updated the view with it.
+    var seenQuery = ""
 }
 
 @available(iOS 17, tvOS 17, visionOS 1, *)
@@ -38,6 +41,7 @@ struct SearchField: View {
     var body: some View {
         Text(screen.query)
             .onAppear { screen.appearances += 1 }
+            .onChange(of: screen.query) { _, new in screen.seenQuery = new }
             .onChange(of: screen.query, debounce: interval, initial: initial, handle: handle) { old, new in
                 screen.events.append("\(prefix) \(old)->\(new)")
                 if slowAction {
@@ -169,6 +173,9 @@ struct HostedOnChangeTests {
         try #require(await eventually { screen.appearances > 0 }, "the view is on screen")
 
         screen.query = "S"
+        // Push only once the field has seen the change: set in the same turn, SwiftUI can apply
+        // both in one update and never show the change to the covered field.
+        try #require(await eventually { screen.seenQuery == "S" }, "the field saw the change")
         screen.path.append(1)
         #expect(await eventually { screen.events == ["v1 ->S"] })
     }
