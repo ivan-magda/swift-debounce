@@ -15,6 +15,8 @@ jobs:
   apple:
     name: Apple platforms (latest Xcode)
     runs-on: macos-latest
+    # A normal run takes under 10 minutes; a stuck simulator would otherwise hold the runner for hours.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 
@@ -61,6 +63,8 @@ jobs:
   minimum-toolchain:
     name: Swift 6.0 (Xcode 16), minimum deployment targets
     runs-on: macos-15
+    # A normal run takes under 10 minutes; a stuck simulator would otherwise hold the runner for hours.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 
