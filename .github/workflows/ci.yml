@@ -67,6 +67,11 @@ jobs:
         with:
           xcode-version: '16.0'
 
+      # Finish setting up the selected Xcode. Without it, xcodebuild sometimes reports the iOS,
+      # tvOS, watchOS and visionOS platforms of this older Xcode as not installed.
+      - name: Finish Xcode setup
+        run: xcodebuild -runFirstLaunch
+
       - name: Test
         run: swift test
 
