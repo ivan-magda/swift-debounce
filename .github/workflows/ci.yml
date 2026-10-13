@@ -33,17 +33,25 @@ jobs:
       - name: Build for iOS, tvOS, watchOS, visionOS
         run: |
           for platform in iOS tvOS watchOS visionOS; do
-            xcodebuild build -quiet -scheme swift-debounce -destination "generic/platform=$platform"
+            xcodebuild build -quiet -scheme swift-debounce-Package -destination "generic/platform=$platform"
           done
 
-      - name: Run the README examples on the iOS Simulator
-        working-directory: Examples
+      - name: Pick an iPhone simulator
         run: |
           udid=$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]
           print(next(d["udid"] for runtime, ds in devices.items() if "iOS" in runtime for d in ds if d["name"].startswith("iPhone")))')
-          xcodebuild test -quiet -scheme DebounceExamples-Package -destination "id=$udid"
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
+
+      # `swift test` on macOS can't drive SwiftUI updates, so the modifier's end-to-end tests run
+      # with real views on the iOS Simulator.
+      - name: Test the SwiftUI modifier on the iOS Simulator
+        run: xcodebuild test -quiet -scheme swift-debounce-Package -destination "id=$SIMULATOR" -only-testing:DebounceSwiftUITests
+
+      - name: Run the README examples on the iOS Simulator
+        working-directory: Examples
+        run: xcodebuild test -quiet -scheme DebounceExamples-Package -destination "id=$SIMULATOR"
 
       - name: Build the benchmarks
         run: swift build -c release --package-path Benchmarks
@@ -63,10 +71,11 @@ jobs:
 
       # Newer Xcode versions raise the deployment targets silently (iOS 15, watchOS 9, ...).
       # Xcode 16 still builds for the package's real minimums: iOS 13, tvOS 13, watchOS 6, visionOS 1.
+      # The scheme builds DebounceSwiftUI too, which checks its availability annotations there.
       - name: Build for the minimum iOS, tvOS, watchOS, visionOS
         run: |
           for platform in iOS tvOS watchOS visionOS; do
-            xcodebuild build -quiet -scheme swift-debounce -destination "generic/platform=$platform"
+            xcodebuild build -quiet -scheme swift-debounce-Package -destination "generic/platform=$platform"
           done
 
   linux:
