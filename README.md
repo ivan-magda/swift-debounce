@@ -223,6 +223,8 @@ The full description, with the throttler and the leading edge, is in the [docume
 
 In a burst of 100,000 values, `Debouncer.send` takes 16 ns, against 216 ns for a debouncer that keeps one long-lived task per burst and 798 ns for a new `Task` per value. From 8 threads at once, it takes 60 ns against 393 ns and 1,634 ns. The [benchmarks](Benchmarks/README.md) explain each design decision, from the lock to the clock, with numbers you can reproduce.
 
+For the investigation behind the implementation, read [Why my Swift debouncer got 50× faster and what the Swift Runtime has to do with it](https://ivanmagda.dev/posts/swift-debounce-runtime-investigation/). It covers task reuse, runtime metadata, generic specialization, and lock placement, with profiling results and diagrams.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
