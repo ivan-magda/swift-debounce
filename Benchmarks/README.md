@@ -72,16 +72,17 @@ For a person typing, about one value every 5 ms, the differences shrink: about 1
 
 ## 2. Why did the long-lived-task version's `send` cost 190 ns?
 
-A profile (`Locks profile`) of that version's `send` showed the lock wasn't the problem. Most of the time went to the Swift runtime:
+A profile (`Locks profile`) of that version's `send` included runtime metadata lookups and clock calls:
 
-- **`ContinuousClock.Instant` isn't `@frozen`.** It comes from the `_Concurrency` library, which is built with library evolution, so its size isn't known at compile time. Every state-machine value that holds one goes through runtime metadata lookups (`swift_getGenericMetadata`, `swift_getTupleTypeMetadata3`) and value-witness copies on every `send`. Specializing for the value type doesn't help.
+- **Unspecialized generic code.** In the inspected Swift 6.4 build, the benchmark called generic `emit` methods for both implementations, despite the CMO flag. Replacing `SafeStorage`'s `NSRecursiveLock` wrapper with `os_unfair_lock` enabled an `Int` specialization while keeping `Instant`.
+- **The deadline's layout.** `ContinuousClock.Instant` comes from the `_Concurrency` library, which is built with library evolution, and is not `@frozen`. Its layout stays opaque to client code, including code specialized for `Int`.
 - **Reading the clock.** `ContinuousClock.now` takes 29 ns. `mach_continuous_time()`, the counter behind it, takes 5 ns ([`locks.md`](results/2026-10-13/locks.md), section 1).
 
-So the package stores deadlines as `UInt64` ticks of `mach_continuous_time`. Section 4 of [`locks.md`](results/2026-10-13/locks.md) shows that the lock alone doesn't close the gap: it keeps the long-lived-task algorithm, `ContinuousClock.Instant` included, and swaps only the lock. The best of eight locks brings `send` to 94 ns, while the package's `send` takes 14 ns.
+The package stores deadlines as `UInt64` ticks of `mach_continuous_time`. The lock variants in section 4 of [`locks.md`](results/2026-10-13/locks.md) keep the long-lived-task algorithm and `ContinuousClock.Instant`. Their fastest plain-lock variant took about 94 ns per `send`, against 188 ns for the original implementation and 14 ns for the package. That comparison includes differences in specialization as well as locking, so it does not isolate the lock's cost.
 
-**Specialization.** A generic class from another module runs unspecialized unless its code is `@inlinable`. While prototyping, the same `send` cost about 110 ns without `@inlinable` and 12-13 ns with it (or with `-cross-module-optimization`). The package marks `send` `@inlinable`, so your app compiles a version for your value type.
+**Specialization.** The compiler needs access to a generic function's body to specialize it for the caller's value type. `@inlinable` makes that body available to importing modules; CMO can also expose it. While prototyping, the same `send` cost about 110 ns without `@inlinable` and 12-13 ns with it (or with `-cross-module-optimization`). The package marks `send` and its input-path helpers `@inlinable` so the compiler can specialize them for your value type.
 
-The same trap shows up in benchmarks: calling through an existential (`any SomeProtocol`) runs the generic witness. `Scenarios` dispatches to concrete types for that reason, and the `References` target is built with cross-module optimization so the comparison is fair to the reference implementations.
+`Scenarios` uses concrete types to avoid existential dispatch in the measured calls. Concrete dispatch does not guarantee specialization: the two benchmark implementations still called generic `emit` methods in the inspected build.
 
 ## 3. Which lock?
 

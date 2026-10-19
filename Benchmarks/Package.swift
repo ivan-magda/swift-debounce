@@ -10,9 +10,9 @@ let package = Package(
         .package(name: "swift-debounce", path: ".."),
     ],
     targets: [
-        // Cross-module optimization lets the executables specialize the reference implementations,
-        // the same way they specialize the package's @inlinable code. Without it the references
-        // would pay for unspecialized generics and the comparison would be unfair to them.
+        // Enable cross-module optimization for References.
+        // It does not guarantee specialization: the Swift 6.4 build still called
+        // generic emit methods for both reference debouncers. See README.md.
         .target(
             name: "References",
             dependencies: [.product(name: "Debounce", package: "swift-debounce")],

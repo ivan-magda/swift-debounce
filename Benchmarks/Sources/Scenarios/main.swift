@@ -49,9 +49,9 @@ enum Impl: String, CaseIterable {
     /// This package's `Debouncer`.
     case package = "swift-debounce"
 
-    /// Runs `body` with the concrete type behind this case. Every `emit` is then statically
-    /// dispatched and specialized; an existential (`any DebounceUnderTest<Int>`) would run the
-    /// generic, unspecialized witness and add 70-200 ns to every call.
+    /// Runs `body` with a concrete debouncer type to avoid existential dispatch.
+    /// The compiler still needs the callee's body to specialize `emit`; the two
+    /// reference debouncers remained unspecialized in the inspected build.
     func with<Body: WithDebouncer>(_ body: Body) async -> Body.Result {
         switch self {
         case .simple: await body { SimpleDebounce<Int>(dueTime: $0, output: $1) }

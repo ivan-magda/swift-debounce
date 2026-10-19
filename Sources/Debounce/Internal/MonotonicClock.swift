@@ -8,9 +8,11 @@ import Musl
 
 /// A monotonic clock that keeps counting while the device sleeps, read in platform ticks.
 ///
-/// Ticks are stored as a plain `UInt64`. `ContinuousClock.Instant` is deliberately not used on the
-/// hot path: it lives in a resilient library and isn't `@frozen`, so every value holding it needs
-/// runtime metadata and value-witness calls, which made `send` about 14 times slower in the benchmarks.
+/// Storing ticks as `UInt64` keeps deadline arithmetic on plain integers.
+/// `ContinuousClock.Instant` has an opaque layout across module boundaries,
+/// even in code specialized for the input type. On Darwin, our clock benchmark
+/// measured lower overhead for `mach_continuous_time()` than for
+/// `ContinuousClock.now`. See `Benchmarks/README.md`.
 @usableFromInline
 enum _MonotonicClock {
     @inlinable @inline(__always)
